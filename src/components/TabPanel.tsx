@@ -1,6 +1,7 @@
 import React from 'react';
 import { Settings, Repeat, Grid, Download } from 'lucide-react';
 import { exportToSTL } from '../utils/exportSTL';
+import { exportToOBJ } from '../utils/exportOBJ';
 
 interface TabPanelProps {
   children: React.ReactNode;
@@ -30,6 +31,10 @@ export function BottomTabs({ height, onHeightChange, snapToGrid, onSnapToGridCha
   const [radius, setRadius] = React.useState(100);
   const [showWireframe, setShowWireframe] = React.useState(false);
   const [points, setPoints] = React.useState<{ x: number; y: number }[]>([]);
+  const [closureTop, setClosureTop] = React.useState(false);
+  const [closureBase, setClosureBase] = React.useState(false);
+  const [doubleClosure, setDoubleClosure] = React.useState(false);
+  const [layerValue, setLayerValue] = React.useState(1);
 
   React.useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
@@ -87,6 +92,46 @@ export function BottomTabs({ height, onHeightChange, snapToGrid, onSnapToGridCha
     }));
   };
 
+  const handleClosureTopChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.checked;
+    setClosureTop(value);
+    localStorage.setItem('closureTop', value.toString());
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'closureTop',
+      newValue: value.toString()
+    }));
+  };
+
+  const handleClosureBaseChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.checked;
+    setClosureBase(value);
+    localStorage.setItem('closureBase', value.toString());
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'closureBase',
+      newValue: value.toString()
+    }));
+  };
+
+  const handleDoubleClosureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.checked;
+    setDoubleClosure(value);
+    localStorage.setItem('doubleClosure', value.toString());
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'doubleClosure',
+      newValue: value.toString()
+    }));
+  };
+
+  const handleLayerValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = Math.max(1, Number(e.target.value));
+    setLayerValue(value);
+    localStorage.setItem('layerValue', value.toString());
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'layerValue',
+      newValue: value.toString()
+    }));
+  };
+
   const handleHeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Math.max(100, Math.min(2000, Number(e.target.value)));
     onHeightChange(value);
@@ -98,6 +143,14 @@ export function BottomTabs({ height, onHeightChange, snapToGrid, onSnapToGridCha
       return;
     }
     exportToSTL(points, revolutionCycles, wfHeight);
+  };
+
+  const handleExportOBJ = () => {
+    if (points.length < 2) {
+      alert('Please draw a curve before exporting');
+      return;
+    }
+    exportToOBJ(points, revolutionCycles, wfHeight);
   };
 
   React.useEffect(() => {
@@ -195,9 +248,46 @@ export function BottomTabs({ height, onHeightChange, snapToGrid, onSnapToGridCha
         </TabPanel>
         
         <TabPanel value={activeTab} index={1}>
-          <div>
-            <label className="block text-sm font-medium mb-1">Ângulo de Revolução</label>
-            <input type="range" min="0" max="360" className="w-full" />
+          <div className="space-y-4">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={closureTop}
+                onChange={handleClosureTopChange}
+                className="rounded"
+              />
+              <span className="text-sm font-medium">Fechamento Topo</span>
+            </label>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={closureBase}
+                  onChange={handleClosureBaseChange}
+                  className="rounded"
+                />
+                <span className="text-sm font-medium">Fechamento Base</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={doubleClosure}
+                  onChange={handleDoubleClosureChange}
+                  className="rounded"
+                />
+                <span className="text-sm font-medium">Fechamento Duplo</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Camada:</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={layerValue}
+                  onChange={handleLayerValueChange}
+                  className="w-20 px-2 py-1 border rounded text-sm"
+                />
+              </div>
+            </div>
           </div>
         </TabPanel>
         
@@ -210,13 +300,22 @@ export function BottomTabs({ height, onHeightChange, snapToGrid, onSnapToGridCha
         </TabPanel>
         
         <TabPanel value={activeTab} index={3}>
-          <button 
-            onClick={handleExportSTL}
-            className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm flex items-center justify-center gap-2"
-          >
-            <Download size={16} />
-            Exportar como STL
-          </button>
+          <div className="space-y-2">
+            <button 
+              onClick={handleExportSTL}
+              className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm flex items-center justify-center gap-2"
+            >
+              <Download size={16} />
+              Exportar como STL
+            </button>
+            <button 
+              onClick={handleExportOBJ}
+              className="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm flex items-center justify-center gap-2"
+            >
+              <Download size={16} />
+              Exportar como OBJ
+            </button>
+          </div>
         </TabPanel>
       </div>
     </div>

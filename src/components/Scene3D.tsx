@@ -20,19 +20,26 @@ function RevolutionMesh({
   points, 
   revolutionCycles, 
   wfHeight, 
-  showWireframe 
+  showWireframe,
+  closureTop,
+  closureBase,
+  doubleClosure,
+  layerValue
 }: { 
   points: { x: number, y: number }[], 
   revolutionCycles: number,
   wfHeight: number,
-  showWireframe: boolean
+  showWireframe: boolean,
+  closureTop: boolean,
+  closureBase: boolean,
+  doubleClosure: boolean,
+  layerValue: number
 }) {
   const geometry = useMemo(() => 
-    createRevolutionGeometry(points, revolutionCycles, wfHeight), 
-    [points, revolutionCycles, wfHeight]
+    createRevolutionGeometry(points, revolutionCycles, wfHeight, closureTop, closureBase, doubleClosure, layerValue), 
+    [points, revolutionCycles, wfHeight, closureTop, closureBase, doubleClosure, layerValue]
   );
 
-  // Calculate object height
   const height = useMemo(() => {
     if (points.length < 2) return 0;
     const minY = Math.min(...points.map(p => p.y));
@@ -43,7 +50,7 @@ function RevolutionMesh({
   const position = useMemo(() => {
     if (points.length < 2) return [0, 0, 0];
     const minY = Math.min(...points.map(p => p.y));
-    return [0, -minY, 0]; // Position object at grid level
+    return [0, -minY, 0];
   }, [points]);
 
   if (showWireframe) {
@@ -87,6 +94,10 @@ export function Scene3D() {
   const [revolutionCycles, setRevolutionCycles] = useState(180);
   const [wfHeight, setWfHeight] = useState(0);
   const [points, setPoints] = useState<{ x: number, y: number }[]>([]);
+  const [closureTop, setClosureTop] = useState(false);
+  const [closureBase, setClosureBase] = useState(false);
+  const [doubleClosure, setDoubleClosure] = useState(false);
+  const [layerValue, setLayerValue] = useState(1);
 
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
@@ -98,6 +109,14 @@ export function Scene3D() {
         setWfHeight(Number(e.newValue));
       } else if (e.key === 'showWireframe') {
         setShowWireframe(e.newValue === 'true');
+      } else if (e.key === 'closureTop') {
+        setClosureTop(e.newValue === 'true');
+      } else if (e.key === 'closureBase') {
+        setClosureBase(e.newValue === 'true');
+      } else if (e.key === 'doubleClosure') {
+        setDoubleClosure(e.newValue === 'true');
+      } else if (e.key === 'layerValue') {
+        setLayerValue(Number(e.newValue));
       } else if (e.key === 'points') {
         try {
           setPoints(JSON.parse(e.newValue || '[]'));
@@ -120,7 +139,7 @@ export function Scene3D() {
       <OrbitControls 
         enableDamping 
         maxDistance={gridSize}
-        target={[0, 0, 0]} // Center camera target at grid level
+        target={[0, 0, 0]}
       />
       <ambientLight intensity={0.7} />
       <directionalLight position={[1, 1, 1]} intensity={0.5} />
@@ -133,6 +152,10 @@ export function Scene3D() {
           revolutionCycles={revolutionCycles}
           wfHeight={wfHeight}
           showWireframe={showWireframe}
+          closureTop={closureTop}
+          closureBase={closureBase}
+          doubleClosure={doubleClosure}
+          layerValue={layerValue}
         />
       )}
       
@@ -147,7 +170,7 @@ export function Scene3D() {
         fadeDistance={gridSize}
         fadeStrength={1}
         infiniteGrid={false}
-        position={[0, 0, 0]} // Place grid at origin
+        position={[0, 0, 0]}
       />
     </Canvas>
   );

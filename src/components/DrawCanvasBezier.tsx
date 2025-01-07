@@ -33,6 +33,52 @@ export function DrawCanvasBezier({
   const [history, setHistory] = useState<HistoryState[]>([]);
   const [radius, setRadius] = useState(100);
 
+  const getBezierPoint = (p0: Point, p1: Point, p2: Point, p3: Point, t: number): Point => {
+    const cx = 3 * (p1.x - p0.x);
+    const bx = 3 * (p2.x - p1.x) - cx;
+    const ax = p3.x - p0.x - cx - bx;
+    
+    const cy = 3 * (p1.y - p0.y);
+    const by = 3 * (p2.y - p1.y) - cy;
+    const ay = p3.y - p0.y - cy - by;
+    
+    const x = ax * Math.pow(t, 3) + bx * Math.pow(t, 2) + cx * t + p0.x;
+    const y = ay * Math.pow(t, 3) + by * Math.pow(t, 2) + cy * t + p0.y;
+    
+    return { x, y };
+  };
+
+  const updateScene3D = (currentPoints: Point[]) => {
+    if (currentPoints.length < 4) return;
+    
+    // Sample points along the bezier curve
+    const samples = 50; // Number of samples along the curve
+    const sampledPoints: Point[] = [];
+    
+    for (let t = 0; t <= 1; t += 1/samples) {
+      const point = getBezierPoint(
+        currentPoints[0],
+        currentPoints[1],
+        currentPoints[2],
+        currentPoints[3],
+        t
+      );
+      sampledPoints.push(point);
+    }
+    
+    // Convert to millimeters
+    const mmPoints = sampledPoints.map(p => ({
+      x: p.x / scale,
+      y: p.y / scale
+    }));
+    
+    localStorage.setItem('points', JSON.stringify(mmPoints));
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'points',
+      newValue: JSON.stringify(mmPoints)
+    }));
+  };
+
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'radius') {
@@ -61,21 +107,6 @@ export function DrawCanvasBezier({
   const hitTest = (point: Point, x: number, y: number) => {
     const hitRadius = 5;
     return Math.abs(point.x - x) <= hitRadius && Math.abs(point.y - y) <= hitRadius;
-  };
-
-  const updateScene3D = (currentPoints: Point[]) => {
-    if (currentPoints.length < 4) return;
-    
-    const mmPoints = currentPoints.map(p => ({
-      x: p.x / scale,
-      y: p.y / scale
-    }));
-    
-    localStorage.setItem('points', JSON.stringify(mmPoints));
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'points',
-      newValue: JSON.stringify(mmPoints)
-    }));
   };
 
   const drawBezierCurve = (ctx: CanvasRenderingContext2D) => {
