@@ -17,63 +17,79 @@ export function exportToOBJ(
     return;
   }
 
-  const geometry = createRevolutionGeometry(
-    points, 
-    revolutionCycles, 
-    wfHeight,
-    closureTop,
-    closureBase,
-    doubleClosure,
-    layerValue,
-    useCustomRadius,
-    customRadius
-  );
-  
-  // Rotate 90 degrees around X axis
-  const rotationMatrix = new THREE.Matrix4();
-  rotationMatrix.makeRotationX(Math.PI / 2);
-  geometry.applyMatrix4(rotationMatrix);
+  try {
+    const { mainGeometry, cylinderGeometry } = createRevolutionGeometry(
+      points,
+      revolutionCycles,
+      wfHeight,
+      closureTop,
+      closureBase,
+      doubleClosure,
+      layerValue,
+      useCustomRadius,
+      customRadius
+    );
 
-  const positions = geometry.getAttribute('position');
-  const normals = geometry.getAttribute('normal');
-  const indices = geometry.index;
+    // Rotacionar para exportação
+    const rotationMatrix = new THREE.Matrix4();
+    rotationMatrix.makeRotationX(Math.PI / 2);
+    
+    mainGeometry.applyMatrix4(rotationMatrix);
+    if (cylinderGeometry) {
+      cylinderGeometry.applyMatrix4(rotationMatrix);
+    }
 
-  if (!positions || !normals || !indices) return;
+    let output = '# Exported OBJ\n';
+    let vertexCount = 0;
 
-  let output = '# Exported OBJ\n';
+    // Helper function to write geometry
+    const writeGeometry = (geometry: THREE.BufferGeometry) => {
+      const positions = geometry.getAttribute('position');
+      const normals = geometry.getAttribute('normal');
+      const indices = geometry.index;
 
-  // Write vertices
-  for (let i = 0; i < positions.count; i++) {
-    const x = positions.getX(i);
-    const y = positions.getY(i);
-    const z = positions.getZ(i);
-    output += `v ${x} ${y} ${z}\n`;
+      if (!positions || !normals || !indices) return;
+
+      // Write vertices
+      for (let i = 0; i < positions.count; i++) {
+        output += `v ${positions.getX(i)} ${positions.getY(i)} ${positions.getZ(i)}\n`;
+      }
+
+      // Write normals
+      for (let i = 0; i < normals.count; i++) {
+        output += `vn ${normals.getX(i)} ${normals.getY(i)} ${normals.getZ(i)}\n`;
+      }
+
+      // Write faces
+      for (let i = 0; i < indices.count; i += 3) {
+        const a = indices.getX(i) + vertexCount + 1;
+        const b = indices.getX(i + 1) + vertexCount + 1;
+        const c = indices.getX(i + 2) + vertexCount + 1;
+        output += `f ${a}//${a} ${b}//${b} ${c}//${c}\n`;
+      }
+
+      vertexCount += positions.count;
+    };
+
+    // Write main geometry
+    writeGeometry(mainGeometry);
+
+    // Write cylinder if exists
+    if (cylinderGeometry) {
+      writeGeometry(cylinderGeometry);
+    }
+
+    const blob = new Blob([output], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'model.obj';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Error during OBJ export:', error);
   }
-
-  // Write normals
-  for (let i = 0; i < normals.count; i++) {
-    const x = normals.getX(i);
-    const y = normals.getY(i);
-    const z = normals.getZ(i);
-    output += `vn ${x} ${y} ${z}\n`;
-  }
-
-  // Write faces
-  for (let i = 0; i < indices.count; i += 3) {
-    const a = indices.getX(i) + 1;
-    const b = indices.getX(i + 1) + 1;
-    const c = indices.getX(i + 2) + 1;
-    output += `f ${a}//${a} ${b}//${b} ${c}//${c}\n`;
-  }
-
-  const blob = new Blob([output], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'model.obj';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
 }

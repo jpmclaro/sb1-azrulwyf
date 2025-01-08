@@ -190,7 +190,7 @@ export function BottomTabs({ height, onHeightChange, snapToGrid, onSnapToGridCha
 
   const tabs = [
     { label: 'Parametros', icon: <Settings size={16} /> },
-    { label: 'Revolucao', icon: <Repeat size={16} /> },
+    { label: 'Fechamento', icon: <Repeat size={16} /> },
     { label: 'Padroes', icon: <Grid size={16} /> },
     { label: 'Exportar', icon: <Download size={16} /> }
   ];

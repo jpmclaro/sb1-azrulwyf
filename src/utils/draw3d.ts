@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils';
 
 interface Point {
   x: number;
@@ -54,54 +55,125 @@ function createClosureAtLayer(
       centerIndex,
       verticesAtLayer[0]
     );
-  } else if (useCustomRadius) {
-    // Create hole in base with proper triangulation
-    const segments = Math.max(32, verticesAtLayer.length);
-    const holeVerticesStart = vertices.length / 3;
-    
-    // Create hole vertices
-    for (let i = 0; i < segments; i++) {
-      const angle = (i / segments) * Math.PI * 2;
-      const x = avgX + Math.cos(angle) * customRadius;
-      const z = avgZ + Math.sin(angle) * customRadius;
-      vertices.push(x, layerHeight, z);
-    }
-
-    // Create triangles between outer edge and hole
-    const outerVerticesCount = verticesAtLayer.length;
-    for (let i = 0; i < segments; i++) {
-      const holeCurrentIndex = holeVerticesStart + i;
-      const holeNextIndex = holeVerticesStart + ((i + 1) % segments);
-      
-      const outerIndex = verticesAtLayer[Math.floor((i * outerVerticesCount) / segments) % outerVerticesCount];
-      const nextOuterIndex = verticesAtLayer[Math.floor(((i + 1) * outerVerticesCount) / segments) % outerVerticesCount];
-
-      indices.push(
-        outerIndex,
-        holeCurrentIndex,
-        holeNextIndex,
-        outerIndex,
-        holeNextIndex,
-        nextOuterIndex
-      );
-    }
   } else {
+    // Criar fechamento da base
     const centerIndex = vertices.length / 3;
     vertices.push(avgX, layerHeight, avgZ);
 
-    for (let i = 0; i < verticesAtLayer.length - 1; i++) {
+    // Se tiver furo, criar primeiro o furo e depois o anel externo
+    if (useCustomRadius) {
+      const segments = 32;
+      const holeStartIndex = vertices.length / 3;
+      const holeRadius = customRadius;
+
+      // Criar vértices do furo
+      for (let i = 0; i < segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+        const x = avgX + Math.cos(angle) * holeRadius;
+        const z = avgZ + Math.sin(angle) * holeRadius;
+        vertices.push(x, layerHeight, z);
+      }
+
+      // Criar anel entre borda externa e furo
+      for (let i = 0; i < verticesAtLayer.length; i++) {
+        const current = i;
+        const next = (i + 1) % verticesAtLayer.length;
+        const holeCurrentIndex = holeStartIndex + (Math.floor(i * segments / verticesAtLayer.length) % segments);
+        const holeNextIndex = holeStartIndex + (Math.floor((i + 1) * segments / verticesAtLayer.length) % segments);
+
+        // Criar quadriláteros entre a borda externa e o furo
+        indices.push(
+          verticesAtLayer[current],
+          verticesAtLayer[next],
+          holeCurrentIndex
+        );
+        indices.push(
+          verticesAtLayer[next],
+          holeNextIndex,
+          holeCurrentIndex
+        );
+      }
+    } else {
+      // Fechamento normal sem furo
+      for (let i = 0; i < verticesAtLayer.length - 1; i++) {
+        indices.push(
+          verticesAtLayer[i + 1],
+          centerIndex,
+          verticesAtLayer[i]
+        );
+      }
       indices.push(
-        verticesAtLayer[i + 1],
+        verticesAtLayer[0],
         centerIndex,
-        verticesAtLayer[i]
+        verticesAtLayer[verticesAtLayer.length - 1]
       );
     }
-    indices.push(
-      verticesAtLayer[0],
-      centerIndex,
-      verticesAtLayer[verticesAtLayer.length - 1]
-    );
   }
+}
+
+function createCylinderGeometry(radius: number): THREE.BufferGeometry {
+  const segments = 32;
+  const cylinderRadius = radius;
+  
+  // Criar cilindro com openEnded = true para não ter faces nas extremidades
+  const cylinder = new THREE.CylinderGeometry(
+    cylinderRadius,  // raio superior
+    cylinderRadius,  // raio inferior
+    3,              // altura
+    segments,       // segmentos
+    1,              // heightSegments
+    true,           // openEnded = true para não criar faces nas extremidades
+    0,
+    Math.PI * 2
+  );
+
+  // Criar e adicionar apenas a face superior
+  const topCenter = new THREE.Vector3(0, 1.5, 0);
+  const topVertices: number[] = [];
+  const topIndices: number[] = [];
+  
+  // Adicionar vértice central do topo
+  topVertices.push(topCenter.x, topCenter.y, topCenter.z);
+  
+  // Adicionar vértices da borda superior
+  for (let i = 0; i < segments; i++) {
+    const angle = (i / segments) * Math.PI * 2;
+    const x = Math.cos(angle) * cylinderRadius;
+    const z = Math.sin(angle) * cylinderRadius;
+    topVertices.push(x, 1.5, z);
+  }
+
+  // Criar triângulos para a face superior
+  for (let i = 0; i < segments; i++) {
+    const current = i + 1;
+    const next = i + 2 > segments ? 1 : i + 2;
+    topIndices.push(0, current, next);
+  }
+
+  // Combinar com a geometria do cilindro
+  const positions = [...cylinder.attributes.position.array, ...topVertices];
+  const normalCount = cylinder.attributes.position.count + segments + 1;
+  const normals = new Float32Array(normalCount * 3).fill(0);
+  
+  // Atualizar índices para incluir a face superior
+  const cylinderIndices = [...cylinder.index.array];
+  const newIndices = [
+    ...cylinderIndices,
+    ...topIndices.map(i => i + cylinder.attributes.position.count)
+  ];
+
+  // Criar nova geometria com tudo combinado
+  const finalGeometry = new THREE.BufferGeometry();
+  finalGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  finalGeometry.setIndex(newIndices);
+  finalGeometry.computeVertexNormals();
+
+  return finalGeometry;
+}
+
+export interface RevolutionResult {
+  mainGeometry: THREE.BufferGeometry;
+  cylinderGeometry?: THREE.BufferGeometry;
 }
 
 export function createRevolutionGeometry(
@@ -114,9 +186,9 @@ export function createRevolutionGeometry(
   layerValue: number = 1,
   useCustomRadius: boolean = false,
   customRadius: number = 0
-): THREE.BufferGeometry {
+): RevolutionResult {
   if (points.length < 2) {
-    return new THREE.BufferGeometry();
+    return { mainGeometry: new THREE.BufferGeometry() };
   }
 
   const minY = Math.min(...points.map(p => p.y));
@@ -218,13 +290,19 @@ export function createRevolutionGeometry(
     createClosureAtLayer(vertices, indices, minY, false, useCustomRadius, customRadius);
   }
 
-  const geometry = new THREE.BufferGeometry();
+  const mainGeometry = new THREE.BufferGeometry();
   
   if (vertices.length >= 3 && indices.length >= 3) {
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-    geometry.setIndex(indices);
-    geometry.computeVertexNormals();
+    mainGeometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    mainGeometry.setIndex(indices);
+    mainGeometry.computeVertexNormals();
   }
 
-  return geometry;
+  let cylinderGeometry: THREE.BufferGeometry | undefined;
+  if (closureBase && useCustomRadius) {
+    cylinderGeometry = createCylinderGeometry(customRadius);
+    cylinderGeometry.translate(0, 1.5, 0);
+  }
+
+  return { mainGeometry, cylinderGeometry };
 }

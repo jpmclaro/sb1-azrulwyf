@@ -16,6 +16,47 @@ function ObjectHeight({ height }: { height: number }) {
   );
 }
 
+function CylinderMesh({ radius, position }: { radius: number, position: [number, number, number] }) {
+  const geometry = useMemo(() => {
+    // Criar o cilindro com a face superior fechada e inferior aberta
+    const cylinder = new THREE.CylinderGeometry(
+      radius,    // raio superior
+      radius,    // raio inferior
+      3,         // altura
+      32,        // segmentos
+      1,         // altura segmentos
+      false,     // openEnded (false = fechado)
+      0,         // thetaStart
+      Math.PI * 2 // thetaLength
+    );
+
+    // Remove faces da base mantendo apenas a parte superior
+    const positions = cylinder.attributes.position;
+    const indices = [...cylinder.index.array];
+    const numVertices = positions.count;
+    
+    const newIndices = indices.filter((_, i) => {
+      const faceIndex = Math.floor(i / 3);
+      const lastRingStart = numVertices - 33;
+      return faceIndex < (indices.length / 3) - 32;
+    });
+
+    cylinder.setIndex(newIndices);
+    return cylinder;
+  }, [radius]);
+
+  return (
+    <mesh position={[position[0], position[1], position[2]]} geometry={geometry}>
+      <meshStandardMaterial 
+        color="#ff8c00" 
+        metalness={0.1} 
+        roughness={0.5}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  );
+}
+
 function RevolutionMesh({ 
   points, 
   revolutionCycles, 
@@ -39,7 +80,7 @@ function RevolutionMesh({
   useCustomRadius: boolean,
   customRadius: number
 }) {
-  const geometry = useMemo(() => 
+  const { mainGeometry, cylinderGeometry } = useMemo(() => 
     createRevolutionGeometry(
       points, 
       revolutionCycles, 
@@ -61,15 +102,18 @@ function RevolutionMesh({
     return Math.abs(maxY - minY);
   }, [points]);
 
+  // Modificar o cálculo da posição para que a base fique em Y=0
   const position = useMemo(() => {
     if (points.length < 2) return [0, 0, 0];
     const minY = Math.min(...points.map(p => p.y));
-    return [0, -minY, 0];
+    const maxY = Math.max(...points.map(p => p.y));
+    // Ajusta a posição Y para que a base fique em 0
+    return [0, 0, 0];
   }, [points]);
 
   return (
     <group position={position}>
-      <mesh geometry={geometry}>
+      <mesh geometry={mainGeometry}>
         <meshStandardMaterial 
           color="#ff8c00" 
           metalness={0.1} 
@@ -81,9 +125,19 @@ function RevolutionMesh({
       </mesh>
       {showWireframe && (
         <lineSegments>
-          <wireframeGeometry args={[geometry]} />
+          <wireframeGeometry args={[mainGeometry]} />
           <lineBasicMaterial color="black" transparent opacity={0.3} />
         </lineSegments>
+      )}
+      {cylinderGeometry && (
+        <mesh geometry={cylinderGeometry}>
+          <meshStandardMaterial 
+            color="#ff8c00" 
+            metalness={0.1} 
+            roughness={0.5}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
       )}
       <ObjectHeight height={height} />
     </group>
@@ -91,16 +145,41 @@ function RevolutionMesh({
 }
 
 export function Scene3D() {
-  const [points, setPoints] = useState<{ x: number, y: number }[]>([]);
-  const [revolutionCycles, setRevolutionCycles] = useState(180);
-  const [wfHeight, setWfHeight] = useState(0);
-  const [showWireframe, setShowWireframe] = useState(false);
-  const [closureTop, setClosureTop] = useState(false);
-  const [closureBase, setClosureBase] = useState(false);
-  const [doubleClosure, setDoubleClosure] = useState(false);
-  const [layerValue, setLayerValue] = useState(1);
-  const [useCustomRadius, setUseCustomRadius] = useState(false);
-  const [customRadius, setCustomRadius] = useState(10);
+  const [points, setPoints] = useState<{ x: number, y: number }[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('points') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  
+  const [revolutionCycles, setRevolutionCycles] = useState(() => 
+    Number(localStorage.getItem('revolutionCycles')) || 180
+  );
+  const [wfHeight, setWfHeight] = useState(() => 
+    Number(localStorage.getItem('wfHeight')) || 0
+  );
+  const [showWireframe, setShowWireframe] = useState(() => 
+    localStorage.getItem('showWireframe') === 'true'
+  );
+  const [closureTop, setClosureTop] = useState(() => 
+    localStorage.getItem('closureTop') === 'true'
+  );
+  const [closureBase, setClosureBase] = useState(() => 
+    localStorage.getItem('closureBase') === 'true'
+  );
+  const [doubleClosure, setDoubleClosure] = useState(() => 
+    localStorage.getItem('doubleClosure') === 'true'
+  );
+  const [layerValue, setLayerValue] = useState(() => 
+    Number(localStorage.getItem('layerValue')) || 1
+  );
+  const [useCustomRadius, setUseCustomRadius] = useState(() => 
+    localStorage.getItem('useCustomRadius') === 'true'
+  );
+  const [customRadius, setCustomRadius] = useState(() => 
+    Number(localStorage.getItem('customRadius')) || 10
+  );
 
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
