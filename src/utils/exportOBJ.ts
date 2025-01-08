@@ -4,14 +4,30 @@ import { createRevolutionGeometry } from './draw3d';
 export function exportToOBJ(
   points: { x: number; y: number }[], 
   revolutionCycles: number,
-  wfHeight: number
+  wfHeight: number,
+  closureTop: boolean = false,
+  closureBase: boolean = false,
+  doubleClosure: boolean = false,
+  layerValue: number = 1,
+  useCustomRadius: boolean = false,
+  customRadius: number = 0
 ): void {
   if (points.length < 2) {
     console.error('Not enough points to generate OBJ');
     return;
   }
 
-  const geometry = createRevolutionGeometry(points, revolutionCycles, wfHeight);
+  const geometry = createRevolutionGeometry(
+    points, 
+    revolutionCycles, 
+    wfHeight,
+    closureTop,
+    closureBase,
+    doubleClosure,
+    layerValue,
+    useCustomRadius,
+    customRadius
+  );
   
   // Rotate 90 degrees around X axis
   const rotationMatrix = new THREE.Matrix4();

@@ -1,65 +1,31 @@
-import * as THREE from 'three';
-import { createRevolutionGeometry } from './draw3d';
-
-function geometryToSTL(geometry: THREE.BufferGeometry): string {
-  // Create rotation matrix for 90 degrees around X axis
-  const rotationMatrix = new THREE.Matrix4();
-  rotationMatrix.makeRotationX(Math.PI / 2);
-  
-  // Apply rotation to geometry
-  geometry.applyMatrix4(rotationMatrix);
-  
-  const vector = new THREE.Vector3();
-  const normalMatrix = new THREE.Matrix3();
-
-  let output = 'solid exported\n';
-
-  const positions = geometry.getAttribute('position');
-  const normals = geometry.getAttribute('normal');
-  const indices = geometry.index;
-
-  if (!positions || !normals || !indices) {
-    return output + 'endsolid exported\n';
-  }
-
-  for (let i = 0; i < indices.count; i += 3) {
-    output += 'facet normal ';
-
-    // Get normal for this face
-    vector.fromBufferAttribute(normals, indices.getX(i));
-    normalMatrix.getNormalMatrix(new THREE.Matrix4());
-    vector.applyMatrix3(normalMatrix);
-
-    output += `${vector.x} ${vector.y} ${vector.z}\n`;
-    output += '  outer loop\n';
-
-    // Add vertices
-    for (let j = 0; j < 3; j++) {
-      const vertexIndex = indices.getX(i + j);
-      vector.fromBufferAttribute(positions, vertexIndex);
-
-      output += `    vertex ${vector.x} ${vector.y} ${vector.z}\n`;
-    }
-
-    output += '  endloop\nendfacet\n';
-  }
-
-  output += 'endsolid exported\n';
-  return output;
-}
-
 export function exportToSTL(
   points: { x: number; y: number }[], 
   revolutionCycles: number,
-  wfHeight: number
+  wfHeight: number,
+  closureTop: boolean = false,
+  closureBase: boolean = false,
+  doubleClosure: boolean = false,
+  layerValue: number = 1,
+  useCustomRadius: boolean = false,
+  customRadius: number = 0
 ): void {
   if (points.length < 2) {
     console.error('Not enough points to generate STL');
     return;
   }
 
-  // Create geometry
-  const geometry = createRevolutionGeometry(points, revolutionCycles, wfHeight);
+  // Create geometry with closures
+  const geometry = createRevolutionGeometry(
+    points, 
+    revolutionCycles, 
+    wfHeight,
+    closureTop,
+    closureBase,
+    doubleClosure,
+    layerValue,
+    useCustomRadius,
+    customRadius
+  );
   
   // Convert to STL string
   const stlString = geometryToSTL(geometry);

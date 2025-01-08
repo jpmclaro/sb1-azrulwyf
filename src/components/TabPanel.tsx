@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Settings, Repeat, Grid, Download } from 'lucide-react';
 import { exportToSTL } from '../utils/exportSTL';
 import { exportToOBJ } from '../utils/exportOBJ';
@@ -25,16 +25,17 @@ function TabPanel({ children, value, index }: TabPanelProps) {
 }
 
 export function BottomTabs({ height, onHeightChange, snapToGrid, onSnapToGridChange }: BottomTabsProps) {
-  const [activeTab, setActiveTab] = React.useState(0);
-  const [revolutionCycles, setRevolutionCycles] = React.useState(180);
-  const [wfHeight, setWfHeight] = React.useState(0);
-  const [radius, setRadius] = React.useState(100);
-  const [showWireframe, setShowWireframe] = React.useState(false);
-  const [points, setPoints] = React.useState<{ x: number; y: number }[]>([]);
-  const [closureTop, setClosureTop] = React.useState(false);
-  const [closureBase, setClosureBase] = React.useState(false);
-  const [doubleClosure, setDoubleClosure] = React.useState(false);
-  const [layerValue, setLayerValue] = React.useState(1);
+  const [activeTab, setActiveTab] = useState(0);
+  const [revolutionCycles, setRevolutionCycles] = useState(180);
+  const [wfHeight, setWfHeight] = useState(0);
+  const [showWireframe, setShowWireframe] = useState(false);
+  const [closureTop, setClosureTop] = useState(false);
+  const [closureBase, setClosureBase] = useState(false);
+  const [doubleClosure, setDoubleClosure] = useState(false);
+  const [layerValue, setLayerValue] = useState(1);
+  const [useCustomRadius, setUseCustomRadius] = useState(false);
+  const [customRadius, setCustomRadius] = useState(10);
+  const [points, setPoints] = useState<{ x: number; y: number }[]>([]);
 
   React.useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
@@ -51,13 +52,53 @@ export function BottomTabs({ height, onHeightChange, snapToGrid, onSnapToGridCha
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
-  
-  const handleRadiusChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = Number(e.target.value);
-    setRadius(value);
-    localStorage.setItem('radius', value.toString());
+
+  const handleClosureTopChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.checked;
+    setClosureTop(value);
+    localStorage.setItem('closureTop', value.toString());
     window.dispatchEvent(new StorageEvent('storage', {
-      key: 'radius',
+      key: 'closureTop',
+      newValue: value.toString()
+    }));
+  };
+
+  const handleClosureBaseChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.checked;
+    setClosureBase(value);
+    localStorage.setItem('closureBase', value.toString());
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'closureBase',
+      newValue: value.toString()
+    }));
+  };
+
+  const handleDoubleClosureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.checked;
+    setDoubleClosure(value);
+    localStorage.setItem('doubleClosure', value.toString());
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'doubleClosure',
+      newValue: value.toString()
+    }));
+  };
+
+  const handleCustomRadiusChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = Math.max(1, Number(e.target.value));
+    setCustomRadius(value);
+    localStorage.setItem('customRadius', value.toString());
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'customRadius',
+      newValue: value.toString()
+    }));
+  };
+
+  const handleUseCustomRadiusChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.checked;
+    setUseCustomRadius(value);
+    localStorage.setItem('useCustomRadius', value.toString());
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'useCustomRadius',
       newValue: value.toString()
     }));
   };
@@ -92,36 +133,6 @@ export function BottomTabs({ height, onHeightChange, snapToGrid, onSnapToGridCha
     }));
   };
 
-  const handleClosureTopChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.checked;
-    setClosureTop(value);
-    localStorage.setItem('closureTop', value.toString());
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'closureTop',
-      newValue: value.toString()
-    }));
-  };
-
-  const handleClosureBaseChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.checked;
-    setClosureBase(value);
-    localStorage.setItem('closureBase', value.toString());
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'closureBase',
-      newValue: value.toString()
-    }));
-  };
-
-  const handleDoubleClosureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.checked;
-    setDoubleClosure(value);
-    localStorage.setItem('doubleClosure', value.toString());
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'doubleClosure',
-      newValue: value.toString()
-    }));
-  };
-
   const handleLayerValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Math.max(1, Number(e.target.value));
     setLayerValue(value);
@@ -142,7 +153,17 @@ export function BottomTabs({ height, onHeightChange, snapToGrid, onSnapToGridCha
       alert('Please draw a curve before exporting');
       return;
     }
-    exportToSTL(points, revolutionCycles, wfHeight);
+    exportToSTL(
+      points, 
+      revolutionCycles, 
+      wfHeight,
+      closureTop,
+      closureBase,
+      doubleClosure,
+      layerValue,
+      useCustomRadius,
+      customRadius
+    );
   };
 
   const handleExportOBJ = () => {
@@ -150,7 +171,17 @@ export function BottomTabs({ height, onHeightChange, snapToGrid, onSnapToGridCha
       alert('Please draw a curve before exporting');
       return;
     }
-    exportToOBJ(points, revolutionCycles, wfHeight);
+    exportToOBJ(
+      points, 
+      revolutionCycles, 
+      wfHeight,
+      closureTop,
+      closureBase,
+      doubleClosure,
+      layerValue,
+      useCustomRadius,
+      customRadius
+    );
   };
 
   React.useEffect(() => {
@@ -194,15 +225,6 @@ export function BottomTabs({ height, onHeightChange, snapToGrid, onSnapToGridCha
                 max="2000"
                 value={height}
                 onChange={handleHeightChange}
-                className="w-full px-2 py-1 border rounded text-sm" 
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Raio</label>
-              <input 
-                type="number" 
-                value={radius}
-                onChange={handleRadiusChange}
                 className="w-full px-2 py-1 border rounded text-sm" 
               />
             </div>
@@ -268,6 +290,29 @@ export function BottomTabs({ height, onHeightChange, snapToGrid, onSnapToGridCha
                 />
                 <span className="text-sm font-medium">Fechamento Base</span>
               </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={useCustomRadius}
+                  onChange={handleUseCustomRadiusChange}
+                  className="rounded"
+                />
+                <span className="text-sm font-medium">Furo na Base</span>
+              </label>
+              {useCustomRadius && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Raio:</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={customRadius}
+                    onChange={handleCustomRadiusChange}
+                    className="w-20 px-2 py-1 border rounded text-sm"
+                  />
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-4">
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"

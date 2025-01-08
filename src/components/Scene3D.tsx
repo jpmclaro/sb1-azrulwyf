@@ -24,7 +24,9 @@ function RevolutionMesh({
   closureTop,
   closureBase,
   doubleClosure,
-  layerValue
+  layerValue,
+  useCustomRadius,
+  customRadius
 }: { 
   points: { x: number, y: number }[], 
   revolutionCycles: number,
@@ -33,11 +35,23 @@ function RevolutionMesh({
   closureTop: boolean,
   closureBase: boolean,
   doubleClosure: boolean,
-  layerValue: number
+  layerValue: number,
+  useCustomRadius: boolean,
+  customRadius: number
 }) {
   const geometry = useMemo(() => 
-    createRevolutionGeometry(points, revolutionCycles, wfHeight, closureTop, closureBase, doubleClosure, layerValue), 
-    [points, revolutionCycles, wfHeight, closureTop, closureBase, doubleClosure, layerValue]
+    createRevolutionGeometry(
+      points, 
+      revolutionCycles, 
+      wfHeight, 
+      closureTop, 
+      closureBase, 
+      doubleClosure, 
+      layerValue,
+      useCustomRadius,
+      customRadius
+    ), 
+    [points, revolutionCycles, wfHeight, closureTop, closureBase, doubleClosure, layerValue, useCustomRadius, customRadius]
   );
 
   const height = useMemo(() => {
@@ -53,26 +67,6 @@ function RevolutionMesh({
     return [0, -minY, 0];
   }, [points]);
 
-  if (showWireframe) {
-    return (
-      <group position={position}>
-        <mesh geometry={geometry}>
-          <meshStandardMaterial 
-            color="#ff8c00" 
-            metalness={0.1} 
-            roughness={0.5}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
-        <lineSegments>
-          <wireframeGeometry args={[geometry]} />
-          <lineBasicMaterial color="black" transparent opacity={0.3} />
-        </lineSegments>
-        <ObjectHeight height={height} />
-      </group>
-    );
-  }
-
   return (
     <group position={position}>
       <mesh geometry={geometry}>
@@ -81,28 +75,42 @@ function RevolutionMesh({
           metalness={0.1} 
           roughness={0.5}
           side={THREE.DoubleSide}
+          transparent={showWireframe}
+          opacity={showWireframe ? 0.4 : 1}
         />
       </mesh>
+      {showWireframe && (
+        <lineSegments>
+          <wireframeGeometry args={[geometry]} />
+          <lineBasicMaterial color="black" transparent opacity={0.3} />
+        </lineSegments>
+      )}
       <ObjectHeight height={height} />
     </group>
   );
 }
 
 export function Scene3D() {
-  const [radius, setRadius] = useState(200);
-  const [showWireframe, setShowWireframe] = useState(false);
+  const [points, setPoints] = useState<{ x: number, y: number }[]>([]);
   const [revolutionCycles, setRevolutionCycles] = useState(180);
   const [wfHeight, setWfHeight] = useState(0);
-  const [points, setPoints] = useState<{ x: number, y: number }[]>([]);
+  const [showWireframe, setShowWireframe] = useState(false);
   const [closureTop, setClosureTop] = useState(false);
   const [closureBase, setClosureBase] = useState(false);
   const [doubleClosure, setDoubleClosure] = useState(false);
   const [layerValue, setLayerValue] = useState(1);
+  const [useCustomRadius, setUseCustomRadius] = useState(false);
+  const [customRadius, setCustomRadius] = useState(10);
 
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'radius') {
-        setRadius(Number(e.newValue));
+      if (e.key === 'points') {
+        try {
+          setPoints(JSON.parse(e.newValue || '[]'));
+        } catch (err) {
+          console.error('Failed to parse points:', err);
+          setPoints([]);
+        }
       } else if (e.key === 'revolutionCycles') {
         setRevolutionCycles(Number(e.newValue));
       } else if (e.key === 'wfHeight') {
@@ -117,13 +125,10 @@ export function Scene3D() {
         setDoubleClosure(e.newValue === 'true');
       } else if (e.key === 'layerValue') {
         setLayerValue(Number(e.newValue));
-      } else if (e.key === 'points') {
-        try {
-          setPoints(JSON.parse(e.newValue || '[]'));
-        } catch (err) {
-          console.error('Failed to parse points:', err);
-          setPoints([]);
-        }
+      } else if (e.key === 'useCustomRadius') {
+        setUseCustomRadius(e.newValue === 'true');
+      } else if (e.key === 'customRadius') {
+        setCustomRadius(Number(e.newValue));
       }
     };
     
@@ -131,7 +136,7 @@ export function Scene3D() {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  const gridSize = radius * 2;
+  const gridSize = 400;
   const cameraDistance = gridSize * 0.75;
 
   return (
@@ -156,6 +161,8 @@ export function Scene3D() {
           closureBase={closureBase}
           doubleClosure={doubleClosure}
           layerValue={layerValue}
+          useCustomRadius={useCustomRadius}
+          customRadius={customRadius}
         />
       )}
       
